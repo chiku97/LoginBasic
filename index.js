@@ -1,5 +1,6 @@
 import express from "express";
 import {pool} from "./db/config.js";
+import bcrypt from "bcrypt";
 import createUser from "./migration.js";
 
 
@@ -22,11 +23,17 @@ app.post('/login', async(req, res) => {
     if (result.length === 0) {
         return res.status(401).json({ message: 'Invalid email or password' });
     }
+    const passwordMatch = bcrypt.compareSync(password, result[0].user_password);
+    if (!passwordMatch) {
+        return res.status(401).json({ message: 'Invalid email or password' });
+    }
     return res.status(200).json({ message: 'Login successful',id: result.insertId, email });
   })
 
 app.post('/register', async(req, res) => {
     const { name, email, password } = req.body;
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
     if(!name || !email || !password) {
         return res.status(400).json({ message: 'All fields are required' });
     }
@@ -40,7 +47,7 @@ app.post('/register', async(req, res) => {
         return res.status(400).json({ message: 'Email already exists' });
       }
       const [results] = await pool.query('INSERT INTO user (user_name, user_email, user_password) VALUES (?, ?, ?)', 
-      [name, email, password]);
+      [name, email, hashedPassword]);
       return res.status(200).json({ message: 'User created successfully', userId: results.insertId, name,email });
     }catch (error) {
         console.error('Error inserting user:', error);
